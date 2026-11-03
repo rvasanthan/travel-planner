@@ -1,0 +1,13 @@
+{
+  "appId": "com.wanderly.travelplanner",
+  "appName": "Wanderly Travel Planner",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "FirebaseAuthentication": {
+      "providers": ["google.com"]
+    }
+  }
+}

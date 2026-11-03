@@ -1,0 +1,53 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && request.auth.token.email == "vasanth.ravindran@gmail.com"
+        && request.auth.token.email_verified == true;
+    }
+
+    function isApprovedUser() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == "approved"
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "general";
+    }
+
+    match /users/{uid} {
+      allow get: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(["uid", "email", "displayName", "status", "requestedAt"])
+        && request.resource.data.uid == uid
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.status == "pending";
+      allow update: if isAdmin() || (signedIn() && request.auth.uid == uid
+        && resource.data.status == "rejected"
+        && request.resource.data.status == "pending"
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status", "requestedAt", "displayName"]));
+      allow delete: if isAdmin();
+    }
+
+    match /itineraries/{id} {
+      allow read: if (isApprovedUser() || isAdmin()) && (
+          resource.data.uid == request.auth.uid
+          || request.auth.uid in resource.data.get("sharedWithUids", [])
+        );
+      allow delete: if (isApprovedUser() && resource.data.uid == request.auth.uid)
+        || (isAdmin() && resource.data.uid == request.auth.uid);
+      allow create: if (isApprovedUser() || isAdmin()) && request.resource.data.uid == request.auth.uid;
+      allow update: if (isApprovedUser() && resource.data.uid == request.auth.uid
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["title", "plan", "updatedAt"]))
+                    || (isAdmin()
+                    && resource.data.uid == request.auth.uid
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["title", "plan", "updatedAt"]));
+    }
+  }
+}
