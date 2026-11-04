@@ -8,12 +8,15 @@
     "build": "vite build",
     "preview": "vite preview",
     "android:sync": "npm run build && cap sync android",
-    "android:apk": "npm run android:sync && cd android && ./gradlew assembleDebug"
+    "android:apk": "npm run android:sync && cd android && ./gradlew assembleDebug",
+    "ios:sync": "npm run build && cap sync ios",
+    "ios:open": "npm run ios:sync && cap open ios"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.6.0",
     "@capacitor/android": "^8.6.0",
     "@capacitor/core": "^8.6.0",
+    "@capacitor/ios": "^8.6.0",
     "firebase": "^13.1.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.63.0",
