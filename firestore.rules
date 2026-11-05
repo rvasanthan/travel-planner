@@ -40,7 +40,14 @@ service cloud.firestore {
         );
       allow delete: if (isApprovedUser() && resource.data.uid == request.auth.uid)
         || (isAdmin() && resource.data.uid == request.auth.uid);
-      allow create: if (isApprovedUser() || isAdmin()) && request.resource.data.uid == request.auth.uid;
+      allow create: if (isApprovedUser() || isAdmin())
+            && request.resource.data.uid == request.auth.uid
+            && request.resource.data.keys().hasOnly(["uid", "author", "copiedFrom", "title", "inputs", "plan", "createdAt", "updatedAt"])
+            && request.resource.data.author.uid == request.auth.uid
+            && request.resource.data.author.email == request.auth.token.email
+            && request.resource.data.title is string
+            && request.resource.data.inputs is map
+            && request.resource.data.plan is map;
       allow update: if (isApprovedUser() && resource.data.uid == request.auth.uid
                     && request.resource.data.uid == request.auth.uid
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["title", "plan", "updatedAt"]))
