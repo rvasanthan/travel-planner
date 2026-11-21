@@ -47,6 +47,12 @@ export const generateItinerary = async (inputs) => {
   return data.plan;
 };
 
+export const suggestAttractions = async (inputs) => {
+  getCurrentUser();
+  const { data } = await httpsCallable(fns, "suggestAttractions")(inputs);
+  return data.places;
+};
+
 export const setItineraryShare = async (itineraryId, email, shouldShare) => {
   const { data } = await httpsCallable(fns, "setItineraryShare")({ itineraryId, email, shouldShare });
   return data.sharedWithEmails;

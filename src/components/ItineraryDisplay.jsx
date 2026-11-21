@@ -109,6 +109,24 @@ export default function ItineraryDisplay({ plan, inputs = {}, author, copiedFrom
         </div>
       </header>
 
+      {plan.visa && (
+        <section aria-labelledby="visa-h" className="card p-6 motion-safe:animate-fade-up" style={stagger(1)}>
+          <h2 id="visa-h" className="mb-2 font-display text-xl font-semibold">Visa and entry guidance</h2>
+          <p className="text-sm font-semibold text-slate-900">
+            {({ visa_required: "Visa required", visa_free: "Visa-free entry indicated", visa_on_arrival: "Visa on arrival indicated", evisa: "Electronic visa indicated", unknown: "Requirements not confirmed" })[plan.visa.status] || "Requirements not confirmed"}
+            {inputs.passportCountry && ` for a ${inputs.passportCountry} passport`}
+          </p>
+          <p className="mt-2 text-sm text-slate-700">{plan.visa.summary}</p>
+          {plan.visa.officialUrl && (
+            <a href={plan.visa.officialUrl} target="_blank" rel="noopener noreferrer" className="link mt-3 inline-flex items-center gap-1">
+              Official visa and entry information <ExternalLink className="h-3 w-3" aria-hidden="true" />
+              <span className="sr-only">(opens in a new tab)</span>
+            </a>
+          )}
+          <p className="mt-3 text-xs text-slate-700">Visa rules can change. Confirm requirements and application details with the destination's official immigration authority or embassy before booking.</p>
+        </section>
+      )}
+
       {season && (
         <section aria-labelledby="season-h" className={`rounded-2xl border p-5 motion-safe:animate-pop ${sx.cls}`} style={stagger(1)}>
           <div className="flex items-start gap-3">

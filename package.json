@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "deploy": "npm run build && firebase deploy --project travel-planner-e9fe7 --only hosting,functions,firestore:rules",
     "android:sync": "npm run build && cap sync android",
     "android:apk": "npm run android:sync && cd android && ./gradlew assembleDebug",
     "ios:sync": "npm run build && cap sync ios",
@@ -33,6 +34,7 @@
     "vite": "^8.3.5"
   },
   "overrides": {
-    "@grpc/grpc-js": "^1.14.7"
+    "@grpc/grpc-js": "^1.14.7",
+    "@firebase/app": "0.16.2"
   }
 }

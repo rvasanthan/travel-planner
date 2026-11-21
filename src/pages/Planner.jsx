@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Accessibility, ArrowLeft, ArrowRight, Baby, Car, Check, FileDown, Landmark, Heart, Loader2, Mountain, Palmtree,
+  Accessibility, AlertTriangle, ArrowLeft, ArrowRight, Baby, Car, Check, FileDown, Landmark, Heart, Loader2, Mountain, Palmtree,
   Plane, Printer, Save, Sparkles, Train, Trees, Users, Utensils,
 } from "lucide-react";
-import { auth, generateItinerary } from "../firebase";
+import { auth, generateItinerary, suggestAttractions } from "../firebase";
 import { createItinerary } from "../store";
 import ItineraryDisplay from "../components/ItineraryDisplay";
 import DestinationInput from "../components/DestinationInput";
@@ -17,7 +17,7 @@ const FOODS = ["Indian", "Asian", "Thai", "Mexican", "Italian", "Mediterranean",
 const SPOTS = ["Paris", "Tokyo", "Bali", "Goa", "New York", "Rome", "Dubai", "Swiss Alps"];
 const MODES = [["Flight", Plane], ["Drive", Car], ["Train", Train]];
 const LENGTHS = [["Weekend", 3], ["5 days", 5], ["1 week", 7], ["2 weeks", 14]];
-const STEPS = ["Destination", "Dates", "Travelers", "Tastes"];
+const STEPS = ["Destination", "Dates", "Travelers", "Tastes", "Places"];
 const MESSAGES = ["Charting your route...", "Finding hidden gems...", "Checking the weather...", "Booking the best tables...", "Packing your itinerary..."];
 
 const addDays = (s, n) => new Date(new Date(s + "T00:00:00").getTime() + n * 864e5).toISOString().slice(0, 10);
@@ -83,7 +83,7 @@ export default function Planner() {
   const nav = useNavigate();
   const today = new Date().toISOString().slice(0, 10);
   const [f, setF] = useState({
-    destination: "", mode: "Flight", kids: false, elders: false, ages: "", tripTypes: [TRIP_TYPES[0][0]], foods: [], foodOther: "",
+    destination: "", passportCountry: "", mode: "Flight", kids: false, elders: false, ages: "", tripTypes: [TRIP_TYPES[0][0]], foods: [], foodOther: "",
     startDate: addDays(today, 30), endDate: addDays(today, 34),
   });
   const [step, setStep] = useState(0);
@@ -91,6 +91,10 @@ export default function Planner() {
   const [used, setUsed] = useState(null);
   const [dismissed, setDismissed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
+  const [selectedPlaces, setSelectedPlaces] = useState([]);
+  const [suggestionKey, setSuggestionKey] = useState("");
   const [msgI, setMsgI] = useState(0);
   const [error, setError] = useState("");
   const result = useRef(null);
@@ -107,16 +111,37 @@ export default function Planner() {
   }, [busy]);
 
   const days = Math.round((new Date(f.endDate) - new Date(f.startDate)) / 864e5) + 1;
+  const recommendedPlaces = Math.max(1, days * 3);
 
   const go = (n) => { setError(""); setStep(n); setTimeout(() => heading.current?.focus(), 0); };
 
-  const run = async (startDate = f.startDate) => {
-    setError(""); setBusy(true); setDismissed(false); setMsgI(0);
+  const tripInputs = (startDate = f.startDate) => {
     const { tripTypes, foods, foodOther, ...rest } = f;
-    const inputs = {
+    return {
       ...rest, startDate, endDate: addDays(startDate, days - 1), days,
       tripType: tripTypes.join(", "), food: [...foods, foodOther.trim()].filter(Boolean).join(", "),
     };
+  };
+
+  const loadSuggestions = async () => {
+    const inputs = tripInputs();
+    const key = JSON.stringify(inputs);
+    if (key === suggestionKey && suggestions.length) { go(4); return; }
+    setError(""); setSuggesting(true);
+    try {
+      const places = await suggestAttractions(inputs);
+      setSuggestions(places);
+      setSelectedPlaces([]);
+      setSuggestionKey(key);
+      go(4);
+    } catch (e) {
+      setError(e.message || "Could not suggest attractions. Please try again.");
+    } finally { setSuggesting(false); }
+  };
+
+  const run = async (startDate = f.startDate) => {
+    setError(""); setBusy(true); setDismissed(false); setMsgI(0);
+    const inputs = { ...tripInputs(startDate), selectedPlaces };
     try {
       setPlan(await generateItinerary(inputs));
       setUsed(inputs);
@@ -128,7 +153,9 @@ export default function Planner() {
   const submit = (e) => {
     e.preventDefault();
     if (step === 1 && !(days >= 1 && days <= 14)) return setError("Your trip must be between 1 and 14 days. Please adjust the dates.");
+    if (step === 3) { loadSuggestions(); return; }
     if (step < STEPS.length - 1) return go(step + 1);
+    if (!selectedPlaces.length) return setError("Select at least one attraction to include in your plan.");
     run();
   };
 
@@ -150,6 +177,7 @@ export default function Planner() {
           <Stepper step={step} />
           <p className="text-sm text-slate-700">Step {step + 1} of {STEPS.length}. Fields marked <span aria-hidden="true">*</span><span className="sr-only">with an asterisk</span> are required.</p>
 
+          <fieldset disabled={busy || suggesting} className="min-w-0">
           <div key={step} className="space-y-6 motion-safe:animate-fade-up">
             {step === 0 && (
               <>
@@ -208,6 +236,11 @@ export default function Planner() {
                   <input id="ages" className="field" aria-describedby="ages-h" placeholder="e.g. 35, 33, 6, 68" value={f.ages} onChange={(e) => set("ages", e.target.value)} />
                   <p id="ages-h" className="mt-1 text-sm text-slate-700">Separate ages or ranges with commas. We'll pace the plan to suit everyone.</p>
                 </div>
+                <div>
+                  <label htmlFor="passport-country" className="label">Country that issued your passport <span aria-hidden="true">*</span></label>
+                  <input id="passport-country" className="field" required autoComplete="country-name" aria-describedby="passport-country-h" placeholder="e.g. India" value={f.passportCountry} onChange={(e) => set("passportCountry", e.target.value)} />
+                  <p id="passport-country-h" className="mt-1 text-sm text-slate-700">Visa and entry guidance depends on your passport citizenship. Check official government advice before booking.</p>
+                </div>
               </>
             )}
 
@@ -230,17 +263,38 @@ export default function Planner() {
                 </fieldset>
               </>
             )}
+
+            {step === 4 && (
+              <>
+                <h2 ref={heading} tabIndex={-1} className="font-display text-2xl font-semibold outline-none">Choose your places</h2>
+                <p className="text-sm text-slate-700">Choose attractions to include. Restaurants will be selected for you. Recommendations may need verification.</p>
+                <fieldset>
+                  <legend className="label">Attractions ({selectedPlaces.length} selected)</legend>
+                  <p className="mb-3 text-sm text-slate-700">For {days} {days === 1 ? "day" : "days"}, consider up to about {recommendedPlaces} attractions. Timing depends on distance, hours and your pace.</p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {suggestions.map((place) => (
+                      <label key={place.name} className="relative flex cursor-pointer gap-3 rounded-xl border border-slate-300 bg-white p-4 text-sm has-[:checked]:border-teal-700 has-[:checked]:bg-teal-50 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-teal-700">
+                        <input type="checkbox" className="mt-1 h-4 w-4 shrink-0 accent-teal-700" checked={selectedPlaces.includes(place.name)} onChange={() => setSelectedPlaces((current) => current.includes(place.name) ? current.filter((name) => name !== place.name) : [...current, place.name])} />
+                        <span><span className="block font-semibold text-slate-900">{place.name}</span><span className="mt-1 block text-xs font-medium text-teal-800">{place.type}</span><span className="mt-1 block text-slate-700">{place.description}</span>{place.restriction && <span className="mt-2 flex items-start gap-1.5 text-amber-900"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /><span><strong>Check restrictions:</strong> {place.restriction}</span></span>}</span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                {selectedPlaces.length > recommendedPlaces && <p role="status" className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-950"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /><span>These attractions may not fit your dates. Consider unselecting {selectedPlaces.length - recommendedPlaces} or extending your trip. Actual travel and visit times may allow more or fewer.</span></p>}
+              </>
+            )}
           </div>
+          </fieldset>
 
           {error && <p role="alert" className="rounded-xl border border-rose-300 bg-rose-50 p-3 text-sm font-medium text-rose-900">{error}</p>}
           <div className="flex items-center justify-between gap-3 border-t border-slate-200 pt-5">
-            <button type="button" className="btn-secondary" onClick={() => go(step - 1)} disabled={step === 0 || busy}>
+            <button type="button" className="btn-secondary" onClick={() => go(step - 1)} disabled={step === 0 || busy || suggesting}>
               <ArrowLeft className="h-4 w-4" aria-hidden="true" />Back
             </button>
-            <button className="btn-primary transition hover:-translate-y-0.5 hover:shadow-lg" disabled={busy}>
-              {last ? (busy ? <Loader2 className="h-4 w-4 motion-safe:animate-spin" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />) : null}
-              {last ? (busy ? "Planning your trip..." : "Generate itinerary") : "Next"}
-              {!last && <ArrowRight className="h-4 w-4" aria-hidden="true" />}
+            <button className="btn-primary transition hover:-translate-y-0.5 hover:shadow-lg" disabled={busy || suggesting}>
+              {(busy || suggesting) ? <Loader2 className="h-4 w-4 motion-safe:animate-spin" aria-hidden="true" /> : last && <Sparkles className="h-4 w-4" aria-hidden="true" />}
+              {suggesting ? "Finding places..." : last ? (busy ? "Planning your trip..." : "Generate itinerary") : step === 3 ? "Find places" : "Next"}
+              {!last && !suggesting && <ArrowRight className="h-4 w-4" aria-hidden="true" />}
             </button>
           </div>
         </form>
