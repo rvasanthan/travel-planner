@@ -1,5 +1,5 @@
 import {
-  Accessibility, Baby, CalendarDays, Clock, CloudSun, Equal, ExternalLink, Landmark, Lightbulb, MapPin, Plane, Plus,
+  Accessibility, Baby, CalendarDays, Car, Clock, CloudSun, Equal, ExternalLink, Landmark, Lightbulb, MapPin, Plane, Plus,
   Trash2, TrendingDown, TrendingUp, Trees, Utensils,
 } from "lucide-react";
 import { lazy, Suspense } from "react";
@@ -95,13 +95,16 @@ export default function ItineraryDisplay({ plan, inputs = {}, author, copiedFrom
         {copiedFrom && <p className="mt-1 text-sm text-slate-700">Customized copy of {copiedFrom.author || "another user's itinerary"}</p>}
         {inputs.startDate && (
           <ul className="mt-5 flex flex-wrap gap-2">
+            {inputs.origin && <li className="chip">From {inputs.origin}</li>}
             {dest && <li className="chip"><MapPin className="h-3.5 w-3.5" aria-hidden="true" />{dest}</li>}
             <li className="chip"><CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />{fmt(inputs.startDate)} to {fmt(endDate(inputs.startDate, inputs.days))} ({inputs.days} days)</li>
             {inputs.mode && <li className="chip">By {inputs.mode.toLowerCase()}</li>}
+            {inputs.mode === "Drive" && inputs.vehicleType && <li className="chip">{inputs.vehicleType}{inputs.vehicleModel ? ` · ${inputs.vehicleModel}` : ""}</li>}
             {inputs.kids && <li className="chip"><Baby className="h-3.5 w-3.5" aria-hidden="true" />Kids</li>}
             {inputs.elders && <li className="chip"><Accessibility className="h-3.5 w-3.5" aria-hidden="true" />Elders</li>}
           </ul>
         )}
+        {plan.route?.summary && <p className="mt-3 max-w-3xl text-sm text-slate-700">{plan.route.summary}</p>}
         <div className="mt-5 flex flex-wrap gap-3">
           <Fact icon={CalendarDays} value={plan.days?.length || 0} label="days" />
           <Fact icon={MapPin} value={plan.places?.length || 0} label="places" />
@@ -109,7 +112,13 @@ export default function ItineraryDisplay({ plan, inputs = {}, author, copiedFrom
         </div>
       </header>
 
-      {plan.visa && (
+      <section aria-labelledby="return-h" className={`rounded-xl border p-5 ${plan.returnJourney?.status === "planned" ? "border-teal-200 bg-teal-50" : "border-amber-300 bg-amber-50"}`}>
+        <h2 id="return-h" className="font-display text-lg font-semibold">Return journey</h2>
+        <p className="mt-1 text-sm text-slate-800">{plan.returnJourney?.summary || "Return travel has not been confirmed in this itinerary. Generate a new plan to include the journey home."}</p>
+        {plan.returnJourney?.status === "not_feasible" && <p className="mt-2 text-sm font-semibold text-amber-950">The return journey does not fit the selected dates.</p>}
+      </section>
+
+      {plan.route?.isInternational && plan.visa && (
         <section aria-labelledby="visa-h" className="card p-6 motion-safe:animate-fade-up" style={stagger(1)}>
           <h2 id="visa-h" className="mb-2 font-display text-xl font-semibold">Visa and entry guidance</h2>
           <p className="text-sm font-semibold text-slate-900">
@@ -147,6 +156,24 @@ export default function ItineraryDisplay({ plan, inputs = {}, author, copiedFrom
             </div>
           )}
         </section>
+      )}
+
+      {plan.roadTrip && (
+        <Section icon={Car} title="On the road" id="road-trip-h" delay={2}>
+          <p className="text-sm font-semibold text-slate-900">{plan.roadTrip.driveEstimate}</p>
+          <p className="mt-2 text-sm text-amber-900">Suggestions are unverified. Check the route, opening hours, availability and vehicle compatibility before you travel.</p>
+          {plan.roadTrip.stops?.length > 0 && <ol className="mt-4 divide-y divide-slate-200">
+            {plan.roadTrip.stops.map((stop, index) => <li key={index} className="py-3 first:pt-0">
+              <p className="text-xs font-semibold uppercase text-teal-800">{stop.type} · {stop.area}</p>
+              <p className="mt-1 font-semibold text-slate-900"><MapLink name={stop.name} area={stop.area} /></p>
+              {stop.note && <p className="mt-1 text-sm text-slate-700">{stop.note}</p>}
+            </li>)}
+          </ol>}
+          {plan.roadTrip.regionalFoods?.length > 0 && <div className="mt-5 border-t border-slate-200 pt-4">
+            <h3 className="font-display text-lg font-semibold">Regional foods along the way</h3>
+            <ul className="mt-3 space-y-2">{plan.roadTrip.regionalFoods.map((food, index) => <li key={index} className="text-sm text-slate-700"><strong className="text-slate-900">{food.name}</strong> · {food.area}{food.note && `: ${food.note}`}</li>)}</ul>
+          </div>}
+        </Section>
       )}
 
       <Suspense fallback={<div className="card h-72 animate-pulse bg-slate-100" role="status">Loading itinerary map...</div>}>

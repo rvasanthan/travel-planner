@@ -16,6 +16,7 @@ const TRIP_TYPES = [
 const FOODS = ["Indian", "Asian", "Thai", "Mexican", "Italian", "Mediterranean", "Vegetarian", "Local cuisine"];
 const SPOTS = ["Paris", "Tokyo", "Bali", "Goa", "New York", "Rome", "Dubai", "Swiss Alps"];
 const MODES = [["Flight", Plane], ["Drive", Car], ["Train", Train]];
+const VEHICLES = ["Car", "Electric vehicle", "RV / camper van", "Electric RV / camper van"];
 const LENGTHS = [["Weekend", 3], ["5 days", 5], ["1 week", 7], ["2 weeks", 14]];
 const STEPS = ["Destination", "Dates", "Travelers", "Tastes", "Places"];
 const MESSAGES = ["Charting your route...", "Finding hidden gems...", "Checking the weather...", "Booking the best tables...", "Packing your itinerary..."];
@@ -83,8 +84,8 @@ export default function Planner() {
   const nav = useNavigate();
   const today = new Date().toISOString().slice(0, 10);
   const [f, setF] = useState({
-    destination: "", passportCountry: "", mode: "Flight", kids: false, elders: false, ages: "", tripTypes: [TRIP_TYPES[0][0]], foods: [], foodOther: "",
-    startDate: addDays(today, 30), endDate: addDays(today, 34),
+    origin: "", destination: "", passportCountry: "", mode: "Flight", kids: false, elders: false, ages: "", tripTypes: [TRIP_TYPES[0][0]], foods: [], foodOther: "",
+    startDate: addDays(today, 30), endDate: addDays(today, 34), vehicleType: "Car", vehicleModel: "", chargingConnector: "", vehicleRange: "", vehicleSize: "", departureTime: "",
   });
   const [step, setStep] = useState(0);
   const [plan, setPlan] = useState(null);
@@ -181,9 +182,13 @@ export default function Planner() {
           <div key={step} className="space-y-6 motion-safe:animate-fade-up">
             {step === 0 && (
               <>
-                <h2 ref={heading} tabIndex={-1} className="font-display text-2xl font-semibold outline-none">Where are you headed?</h2>
+                <h2 ref={heading} tabIndex={-1} className="font-display text-2xl font-semibold outline-none">Where are you traveling?</h2>
                 <div>
-                  <label htmlFor="dest" className="label">Destination <span aria-hidden="true">*</span></label>
+                  <label htmlFor="origin" className="label">From <span aria-hidden="true">*</span></label>
+                  <DestinationInput id="origin" required value={f.origin} onChange={(v) => set("origin", v)} />
+                </div>
+                <div>
+                  <label htmlFor="dest" className="label">To <span aria-hidden="true">*</span></label>
                   <DestinationInput id="dest" required value={f.destination} onChange={(v) => set("destination", v)} />
                   <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Popular destinations">
                     {SPOTS.map((s) => <QuickPick key={s} label={s} active={f.destination === s} onClick={() => set("destination", s)} />)}
@@ -195,12 +200,47 @@ export default function Planner() {
                     {MODES.map(([m, Icon]) => <Choice key={m} type="radio" name="mode" label={m} Icon={Icon} checked={f.mode === m} onChange={() => set("mode", m)} />)}
                   </div>
                 </fieldset>
+                {f.mode === "Drive" && (
+                  <div className="space-y-4">
+                    <fieldset>
+                      <legend className="label">Vehicle</legend>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {VEHICLES.map((vehicle) => <Choice key={vehicle} type="radio" name="vehicle" label={vehicle} checked={f.vehicleType === vehicle} onChange={() => set("vehicleType", vehicle)} />)}
+                      </div>
+                    </fieldset>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <label htmlFor="vehicle-model" className="label">Make and model (optional)</label>
+                        <input id="vehicle-model" className="field" maxLength={100} placeholder="e.g. Ford Mustang Mach-E" value={f.vehicleModel} onChange={(e) => set("vehicleModel", e.target.value)} />
+                      </div>
+                      <div>
+                        <label htmlFor="departure-time" className="label">Departure time (optional)</label>
+                        <input id="departure-time" type="time" className="field" value={f.departureTime} onChange={(e) => set("departureTime", e.target.value)} />
+                      </div>
+                      {f.vehicleType.startsWith("Electric") && <>
+                        <div>
+                          <label htmlFor="connector" className="label">Charging connector (optional)</label>
+                          <input id="connector" className="field" maxLength={80} placeholder="e.g. CCS, NACS" value={f.chargingConnector} onChange={(e) => set("chargingConnector", e.target.value)} />
+                        </div>
+                        <div>
+                          <label htmlFor="vehicle-range" className="label">Practical range (optional)</label>
+                          <input id="vehicle-range" className="field" maxLength={60} placeholder="e.g. 220 miles" value={f.vehicleRange} onChange={(e) => set("vehicleRange", e.target.value)} />
+                        </div>
+                      </>}
+                      {f.vehicleType.includes("camper") && <div>
+                        <label htmlFor="vehicle-size" className="label">Vehicle length (optional)</label>
+                        <input id="vehicle-size" className="field" maxLength={80} placeholder="e.g. 24 feet" value={f.vehicleSize} onChange={(e) => set("vehicleSize", e.target.value)} />
+                      </div>}
+                    </div>
+                  </div>
+                )}
               </>
             )}
 
             {step === 1 && (
               <>
                 <h2 ref={heading} tabIndex={-1} className="font-display text-2xl font-semibold outline-none">When are you going?</h2>
+                <p className="text-sm text-slate-700">Choose dates for the full round trip, including your return home.</p>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <label htmlFor="start" className="label">Start date <span aria-hidden="true">*</span></label>
@@ -237,9 +277,9 @@ export default function Planner() {
                   <p id="ages-h" className="mt-1 text-sm text-slate-700">Separate ages or ranges with commas. We'll pace the plan to suit everyone.</p>
                 </div>
                 <div>
-                  <label htmlFor="passport-country" className="label">Country that issued your passport <span aria-hidden="true">*</span></label>
-                  <input id="passport-country" className="field" required autoComplete="country-name" aria-describedby="passport-country-h" placeholder="e.g. India" value={f.passportCountry} onChange={(e) => set("passportCountry", e.target.value)} />
-                  <p id="passport-country-h" className="mt-1 text-sm text-slate-700">Visa and entry guidance depends on your passport citizenship. Check official government advice before booking.</p>
+                  <label htmlFor="passport-country" className="label">Passport issuing country <span className="font-normal text-slate-700">(for international trips)</span></label>
+                  <input id="passport-country" className="field" autoComplete="country-name" aria-describedby="passport-country-h" placeholder="e.g. India" value={f.passportCountry} onChange={(e) => set("passportCountry", e.target.value)} />
+                  <p id="passport-country-h" className="mt-1 text-sm text-slate-700">Optional for domestic travel. Add it for international visa guidance tailored to your passport.</p>
                 </div>
               </>
             )}

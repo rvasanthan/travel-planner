@@ -19,7 +19,8 @@ test("suggestions validate and remove duplicates", () => {
 });
 
 test("prompts preserve attraction choices and include requested activity guidance", () => {
-  const prompt = buildSuggestionPrompt({ dest: "New York", type: "Adventure", days: 3, kids: true, elders: false });
+  const prompt = buildSuggestionPrompt({ origin: "Boston", dest: "New York", type: "Adventure", days: 3, kids: true, elders: false });
+  assert.match(prompt, /from Boston to New York/);
   assert.match(prompt, /theme parks/);
   assert.match(prompt, /boardwalks/);
   assert.match(prompt, /SUMMIT One Vanderbilt/);
